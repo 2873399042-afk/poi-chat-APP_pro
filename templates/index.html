@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>POI Agent</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background-color: #f9f9f9;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    header {
+      background: linear-gradient(135deg, #4CAF50, #2E7D32);
+      color: white;
+      padding: 16px;
+      border-radius: 8px 8px 0 0;
+      text-align: center;
+      font-size: 1.5em;
+      position: relative;
+    }
+
+    header::before {
+      content: "📍";
+      margin-right: 10px;
+      font-size: 1.2em;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    #queryInput {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 1em;
+      outline: none;
+    }
+
+    #queryInput:focus {
+      border-color: #4CAF50;
+    }
+
+    button {
+      padding: 12px 24px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #388E3C;
+    }
+
+    .result-container {
+      margin-top: 20px;
+      padding: 16px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      border-left: 4px solid #4CAF50;
+    }
+
+    .result-header {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .check-icon {
+      color: #4CAF50;
+      font-size: 1.2em;
+    }
+
+    .insight-box {
+      background: #e8f5e9;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      border-left: 3px solid #4CAF50;
+      font-size: 0.95em;
+      color: #2E7D32;
+      display: none;
+    }
+
+    .results-list {
+      font-size: 0.95em;
+    }
+
+    .result-item {
+      margin-bottom: 14px;
+      padding: 10px;
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .result-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .result-item strong {
+      color: #2E7D32;
+    }
+
+    .loading {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+      margin: 20px 0;
+      display: none;
+    }
+
+    a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        margin: 10px;
+        padding: 10px;
+      }
+      .search-box {
+        flex-direction: column;
+      }
+      #queryInput,
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>POI Agent</h1>
+    </header>
+
+    <div class="search-box">
+      <input type="text" id="queryInput" placeholder="例如：南京信息工程大学附近的咖啡店" />
+      <button onclick="submitQuery()">搜索</button>
+    </div>
+
+    <div id="loading" class="loading">正在为您查找，请稍候...</div>
+
+    <div id="resultContainer" class="result-container" style="display: none;">
+      <div id="insightBox" class="insight-box"></div>
+      <div class="result-header">
+        <span class="check-icon">✓</span>
+        <span id="resultCount"></span>
+      </div>
+      <div id="resultsList" class="results-list"></div>
+    </div>
+  </div>
+
+  <script>
+    async function submitQuery() {
+      const input = document.getElementById("queryInput");
+      const query = input.value.trim();
+      if (!query) {
+        alert("请输入您的查询内容！");
+        return;
+      }
+
+      const loading = document.getElementById("loading");
+      const resultContainer = document.getElementById("resultContainer");
+      const insightBox = document.getElementById("insightBox");
+      loading.style.display = "block";
+      resultContainer.style.display = "none";
+
+      try {
+        const res = await fetch("/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: query })
+        });
+
+        const data = await res.json();
+        if (data.error) {
+          alert("❌ " + data.error);
+          return;
+        }
+
+        // 显示空间洞察
+        if (data.insight) {
+          insightBox.textContent = data.insight;
+          insightBox.style.display = "block";
+        } else {
+          insightBox.style.display = "none";
+        }
+
+        // 更新结果数量
+        document.getElementById("resultCount").textContent = "找到 " + data.total + " 个结果：";
+
+        // 渲染列表
+        const list = document.getElementById("resultsList");
+        list.innerHTML = "";
+
+        data.results.forEach(function(item) {
+          const div = document.createElement("div");
+          div.className = "result-item";
+          div.innerHTML =
+            "<strong>" + item.id + ". " + (item.name || "未知名称") + "</strong><br>" +
+            "类型: " + (item.type || "未知") + "<br>" +
+            "地址: " + (item.address || "暂无地址") + "<br>" +
+            "电话: " + (item.phone || "暂无") + "<br>" +
+            "经纬度: " + item.lng + ", " + item.lat + "<br>" +
+            '<a href="' + item.detail_url + '" target="_blank">🔗 [查看详情]</a>';
+          list.appendChild(div);
+        });
+
+        resultContainer.style.display = "block";
+      } catch (e) {
+        console.error(e);
+        alert("网络请求失败，请检查后端是否运行。");
+      } finally {
+        loading.style.display = "none";
+      }
+    }
+
+    document.getElementById("queryInput").addEventListener("keyup", function(e) {
+      if (e.key === "Enter") {
+        submitQuery();
+      }
+    });
+  </script>
+</body>
+</html>
