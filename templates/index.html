@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>POI Agent</title>
+  <title>POI Agent </title>
   <style>
+    /* 重置默认样式 */
     * {
       margin: 0;
       padding: 0;
@@ -25,10 +26,13 @@
       background: white;
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      height: 80vh;
+      display: flex;
+      flex-direction: column;
     }
 
     header {
-      background: linear-gradient(135deg, #4CAF50, #2E7D32);
+      background: linear-gradient(135deg, #2196F3, #0D47A1);
       color: white;
       padding: 16px;
       border-radius: 8px 8px 0 0;
@@ -43,10 +47,84 @@
       font-size: 1.2em;
     }
 
-    .search-box {
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      background: #fafafa;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+
+    .message {
+      margin-bottom: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+
+    /* 用户消息样式 - 蓝色系 */
+    .user-message {
+      background: #e3f2fd;
+      margin-left: auto;
+      border-left: 4px solid #0D47A1;
+    }
+
+    /* 机器人消息样式 - 蓝色系 */
+    .bot-message {
+      background: #f5f5f5;
+      margin-right: auto;
+      border-left: 4px solid #2196F3;
+    }
+
+    .bot-message .result-container {
+      margin-top: 10px;
+      padding: 10px;
+      background: white;
+      border-radius: 6px;
+      border-left: 3px solid #2196F3;
+    }
+
+    .bot-message .insight-box {
+      background: #e3f5ff;
+      padding: 8px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      border-left: 2px solid #2196F3;
+      font-size: 0.9em;
+      color: #0D47A1;
+    }
+
+    .bot-message .result-header {
+      font-weight: bold;
+      color: #0D47A1;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .bot-message .results-list {
+      font-size: 0.9em;
+    }
+
+    .bot-message .result-item {
+      margin-bottom: 10px;
+      padding: 8px;
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .bot-message .result-item strong {
+      color: #0D47A1;
+    }
+
+    .input-area {
       display: flex;
       gap: 10px;
-      margin: 20px 0;
+      margin-top: 10px;
     }
 
     #queryInput {
@@ -59,12 +137,12 @@
     }
 
     #queryInput:focus {
-      border-color: #4CAF50;
+      border-color: #2196F3;
     }
 
     button {
       padding: 12px 24px;
-      background: #4CAF50;
+      background: #2196F3;
       color: white;
       border: none;
       border-radius: 8px;
@@ -74,66 +152,14 @@
     }
 
     button:hover {
-      background: #388E3C;
-    }
-
-    .result-container {
-      margin-top: 20px;
-      padding: 16px;
-      background: #f5f5f5;
-      border-radius: 8px;
-      border-left: 4px solid #4CAF50;
-    }
-
-    .result-header {
-      font-weight: bold;
-      color: #333;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .check-icon {
-      color: #4CAF50;
-      font-size: 1.2em;
-    }
-
-    .insight-box {
-      background: #e8f5e9;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-      border-left: 3px solid #4CAF50;
-      font-size: 0.95em;
-      color: #2E7D32;
-      display: none;
-    }
-
-    .results-list {
-      font-size: 0.95em;
-    }
-
-    .result-item {
-      margin-bottom: 14px;
-      padding: 10px;
-      background: white;
-      border-radius: 6px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    }
-
-    .result-item:last-child {
-      margin-bottom: 0;
-    }
-
-    .result-item strong {
-      color: #2E7D32;
+      background: #0D47A1;
     }
 
     .loading {
       text-align: center;
       color: #666;
       font-style: italic;
-      margin: 20px 0;
+      margin: 10px 0;
       display: none;
     }
 
@@ -145,13 +171,13 @@
     a:hover {
       text-decoration: underline;
     }
-
-    @media (max-width: 600px) {
+    @media (max-width: 800px) {
       .container {
         margin: 10px;
         padding: 10px;
+        height: 90vh;
       }
-      .search-box {
+      .input-area {
         flex-direction: column;
       }
       #queryInput,
@@ -164,91 +190,141 @@
 <body>
   <div class="container">
     <header>
-      <h1>POI Agent</h1>
+      <h1>POI Agent </h1>
     </header>
 
-    <div class="search-box">
-      <input type="text" id="queryInput" placeholder="例如：南京信息工程大学附近的咖啡店" />
-      <button onclick="submitQuery()">搜索</button>
+    <!-- 聊天容器 -->
+    <div id="chatContainer" class="chat-container">
+      <!-- 初始欢迎消息 -->
+      <div class="message bot-message">
+        您好！我是POI Agent助手，可以帮助您查询附近的地点信息。您可以问我："南京新街口附近的咖啡店" 或 "上海陆家嘴的餐厅" 等。
+      </div>
     </div>
 
-    <div id="loading" class="loading">正在为您查找，请稍候...</div>
+    <!-- 加载提示 -->
+    <div id="loading" class="loading">AI正在为您查找，请稍候...</div>
 
-    <div id="resultContainer" class="result-container" style="display: none;">
-      <div id="insightBox" class="insight-box"></div>
-      <div class="result-header">
-        <span class="check-icon">✓</span>
-        <span id="resultCount"></span>
-      </div>
-      <div id="resultsList" class="results-list"></div>
+    <!-- 输入区域 -->
+    <div class="input-area">
+      <input type="text" id="queryInput" placeholder="请输入您的查询（如：附近的奶茶店）" />
+      <button onclick="submitQuery()">发送</button>
     </div>
   </div>
 
   <script>
+    // 初始化会话ID
+    let sessionId = Date.now().toString(); // 生成会话ID，用于多轮对话上下文保持
+
+    /**
+     * 提交查询函数
+     * 向后端发送查询请求，并处理返回结果
+     */
     async function submitQuery() {
       const input = document.getElementById("queryInput");
       const query = input.value.trim();
+
+      // 验证输入是否为空
       if (!query) {
         alert("请输入您的查询内容！");
         return;
       }
 
+      // 添加用户消息到聊天记录
+      addMessageToChat(query, 'user');
+      input.value = ''; // 清空输入框
+
       const loading = document.getElementById("loading");
-      const resultContainer = document.getElementById("resultContainer");
-      const insightBox = document.getElementById("insightBox");
-      loading.style.display = "block";
-      resultContainer.style.display = "none";
+      loading.style.display = "block"; // 显示加载状态
 
       try {
+        // 向后端发送查询请求
         const res = await fetch("/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: query })
+          body: JSON.stringify({
+            query: query,
+            session_id: sessionId // 发送会话ID，以便后端保持上下文
+          })
         });
 
         const data = await res.json();
+
+        // 检查是否有错误
         if (data.error) {
-          alert("❌ " + data.error);
+          addMessageToChat("❌ " + data.error, 'bot');
           return;
         }
 
-        // 显示空间洞察
-        if (data.insight) {
-          insightBox.textContent = data.insight;
-          insightBox.style.display = "block";
-        } else {
-          insightBox.style.display = "none";
+        // 更新会话ID（如果服务器返回了新的会话ID）
+        if(data.session_id) {
+          sessionId = data.session_id;
         }
 
-        // 更新结果数量
-        document.getElementById("resultCount").textContent = "找到 " + data.total + " 个结果：";
+        // 构建机器人回复消息
+        let botResponse = "";
 
-        // 渲染列表
-        const list = document.getElementById("resultsList");
-        list.innerHTML = "";
+        // 添加空间洞察信息
+        if (data.insight) {
+          botResponse += `<div class="insight-box">${data.insight}</div>`;
+        }
 
+        // 添加结果头部信息
+        botResponse += `
+          <div class="result-header">
+            <span>✓</span>
+            <span>找到 ${data.total} 个结果：</span>
+          </div>
+          <div class="results-list">
+        `;
+
+        // 遍历结果数组，构建结果列表
         data.results.forEach(function(item) {
-          const div = document.createElement("div");
-          div.className = "result-item";
-          div.innerHTML =
-            "<strong>" + item.id + ". " + (item.name || "未知名称") + "</strong><br>" +
-            "类型: " + (item.type || "未知") + "<br>" +
-            "地址: " + (item.address || "暂无地址") + "<br>" +
-            "电话: " + (item.phone || "暂无") + "<br>" +
-            "经纬度: " + item.lng + ", " + item.lat + "<br>" +
-            '<a href="' + item.detail_url + '" target="_blank">🔗 [查看详情]</a>';
-          list.appendChild(div);
+          botResponse += `
+            <div class="result-item">
+              <strong>${item.id}. ${item.name || "未知名称"}</strong><br>
+              类型: ${item.type || "未知"}<br>
+              地址: ${item.address || "暂无地址"}<br>
+              电话: ${item.phone || "暂无"}<br>
+              经纬度: ${item.lng}, ${item.lat}<br>
+              <a href="${item.detail_url}" target="_blank">🔗 [查看详情]</a>
+            </div>
+          `;
         });
 
-        resultContainer.style.display = "block";
+        botResponse += "</div>";
+
+        // 添加机器人消息到聊天记录
+        addMessageToChat(botResponse, 'bot');
       } catch (e) {
         console.error(e);
-        alert("网络请求失败，请检查后端是否运行。");
+        addMessageToChat("❌ 网络请求失败，请检查后端是否运行。", 'bot');
       } finally {
-        loading.style.display = "none";
+        loading.style.display = "none"; // 隐藏加载状态
       }
     }
 
+    /**
+     * 将消息添加到聊天记录中
+     * @param {string} content - 消息内容
+     * @param {string} sender - 发送者类型 ('user' 或 'bot')
+     */
+    function addMessageToChat(content, sender) {
+      const chatContainer = document.getElementById("chatContainer");
+      const messageDiv = document.createElement("div");
+      messageDiv.className = `message ${sender}-message`;
+
+      // 根据发送者类型设置消息内容
+      if(sender === 'bot') {
+        messageDiv.innerHTML = content; // 机器人消息包含HTML格式
+      } else {
+        messageDiv.textContent = content; // 用户消息为纯文本
+      }
+
+      chatContainer.appendChild(messageDiv);
+      chatContainer.scrollTop = chatContainer.scrollHeight; // 自动滚动到底部
+    }
+
+    // 监听回车键事件，按下回车时提交查询
     document.getElementById("queryInput").addEventListener("keyup", function(e) {
       if (e.key === "Enter") {
         submitQuery();
