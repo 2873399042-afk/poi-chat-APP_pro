@@ -7,6 +7,7 @@ import dashscope
 from math import radians, cos, sin, asin, sqrt
 import numpy as np
 from sklearn.neighbors import KernelDensity
+from conversation_engine import process_chat_message
 
 # 初始化 Flask 应用
 app = Flask(__name__)
@@ -17,12 +18,12 @@ dashscope.api_key = DASHSCOPE_API_KEY
 # 默认兜底城市
 DEFAULT_CITY = "南京"
 # 单页返回最大结果数
-RESULT_LIMIT = 50
+RESULT_LIMIT = 100
 # 存储对话上下文
 conversation_context = {}
 
 
-# ========== 【升级】支持多POI类型的NLP解析 ==========
+# ========== 支持多POI类型的NLP解析 ==========
 def parse_query_with_context(user_query, last_city=DEFAULT_CITY):
     """支持多POI类型并列解析，区分目标POI和附属筛选条件"""
     # POI白名单（保持原有不变）
@@ -36,7 +37,7 @@ def parse_query_with_context(user_query, last_city=DEFAULT_CITY):
     ]
     whitelist_str = "、".join(POI_WHITELIST)
 
-    # 【升级】Prompt支持多关键词解析
+    # 支持多关键词解析
     prompt = f"""
 你是一个地理信息助手，请输出纯JSON，仅包含字段：city, keywords, sub_keywords, location_desc。
 字段严格定义：
@@ -90,7 +91,7 @@ def parse_query_with_context(user_query, last_city=DEFAULT_CITY):
 
 
 def extract_fallback_keyword(query):
-    """关键词回退策略（保持原有不变）"""
+    """关键词回退策略"""
     query = query.lower()
     rules = {
         "喝": "咖啡店", "咖啡": "咖啡店", "奶茶": "奶茶店", "茶": "奶茶店",
@@ -127,47 +128,20 @@ def geocode_address(address, city):
     return ""
 
 
-# ========== 【升级】支持多关键词批量POI搜索 ==========
-def search_poi(city, keywords, sub_keywords=[], center=""):
+# ========== 支持多关键词批量POI搜索（3km起，渐进扩圈） ==========
+def search_poi(city, keywords, sub_keywords=[], center="", target_count=None):
     """
-    多关键词POI搜索
+    多关键词POI搜索，支持渐进式半径扩展。
     :param city: 城市
-    :param keywords: 目标POI类型数组（支持多个）
+    :param keywords: 目标POI类型数组
     :param sub_keywords: 附属筛选条件数组
-    :param center: 中心坐标（location_desc解析后的经纬度）
+    :param center: 中心坐标
+    :param target_count: 目标返回条数，为None时不扩圈
     :return: 去重后的POI列表，按距离排序
     """
-
-    # 单个关键词搜索函数
-    def _do_single_search(kw, use_around=True):
-        if center and use_around:
-            url = "https://restapi.amap.com/v3/place/around"
-            params = {
-                "key": AMAP_API_KEY,
-                "keywords": kw,
-                "location": center,
-                "radius": 30000,
-                "offset": 50,
-                "extensions": "all",
-                "output": "json"
-            }
-        else:
-            url = "https://restapi.amap.com/v3/place/text"
-            params = {
-                "key": AMAP_API_KEY,
-                "keywords": kw,
-                "city": city,
-                "offset": 50,
-                "extensions": "all",
-                "output": "json"
-            }
-        try:
-            resp = requests.get(url, params=params, timeout=5).json()
-            if resp.get("status") == "1":
-                return resp.get("pois", [])
-        except Exception as e:
-            print(f"[POI 搜索失败] 关键词:{kw}, 错误:{e}")
-        return []
+    # 渐进式半径（米）：从3km起，逐步扩大
+    RADIUS_TIERS = [3000, 5000, 10000, 20000, 30000]
+    DEFAULT_RADIUS = 3000  # "附近"默认3km
 
     # 同义词兜底映射
     synonym_map = {
@@ -180,33 +154,84 @@ def search_poi(city, keywords, sub_keywords=[], center=""):
         "停车场": ["停车区", "停车位"]
     }
 
-    # ========== 1. 批量搜索所有目标关键词 ==========
-    all_pois = []
-    for kw in keywords:
-        # 第一次搜索
-        pois = _do_single_search(kw, use_around=bool(center))
-        # 兜底：搜索失败用同义词重试
-        if not pois:
-            print(f"[兜底触发] 关键词{kw}无结果，尝试同义词")
-            for alt_kw in synonym_map.get(kw, ["餐厅", "商店"]):
-                pois = _do_single_search(alt_kw, use_around=bool(center))
-                if pois:
-                    break
-        # 加入总列表
-        all_pois.extend(pois)
+    def _do_single_search(kw, use_around=True, radius=DEFAULT_RADIUS):
+        if center and use_around:
+            url = "https://restapi.amap.com/v3/place/around"
+            params = {
+                "key": AMAP_API_KEY,
+                "keywords": kw,
+                "location": center,
+                "radius": radius,
+                "offset": 100,
+                "extensions": "all",
+                "output": "json"
+            }
+        else:
+            url = "https://restapi.amap.com/v3/place/text"
+            params = {
+                "key": AMAP_API_KEY,
+                "keywords": kw,
+                "city": city,
+                "offset": 100,
+                "extensions": "all",
+                "output": "json"
+            }
+        try:
+            resp = requests.get(url, params=params, timeout=5).json()
+            if resp.get("status") == "1":
+                return resp.get("pois", [])
+        except Exception as e:
+            print(f"[POI 搜索失败] 关键词:{kw}, 错误:{e}")
+        return []
 
-    # ========== 2. 去重（按POI唯一ID去重） ==========
-    unique_pois = []
-    exist_ids = set()
-    for poi in all_pois:
-        poi_id = poi.get("id", "")
-        if poi_id and poi_id not in exist_ids:
-            exist_ids.add(poi_id)
-            unique_pois.append(poi)
+    def _collect_pois_for_radius(radius):
+        """按指定半径搜索所有关键词，返回去重POI列表"""
+        all_pois = []
+        for kw in keywords:
+            pois = _do_single_search(kw, use_around=bool(center), radius=radius)
+            if not pois:
+                print(f"[兜底触发] 关键词{kw}在{radius}m无结果，尝试同义词")
+                for alt_kw in synonym_map.get(kw, ["餐厅", "商店"]):
+                    pois = _do_single_search(alt_kw, use_around=bool(center), radius=radius)
+                    if pois:
+                        break
+            all_pois.extend(pois)
+        # 去重
+        seen = set()
+        unique = []
+        for p in all_pois:
+            pid = p.get("id", "")
+            if pid and pid not in seen:
+                seen.add(pid)
+                unique.append(p)
+        return unique
 
-    # ========== 3. 附属条件筛选（检查每个POI周边是否有sub_keywords） ==========
+    # ========== 1. 搜索POI（渐进扩圈） ==========
+    if target_count and center:
+        # 渐进扩圈模式：从小到大尝试半径
+        all_unique = []
+        tried_radii = []
+        for radius in RADIUS_TIERS:
+            print(f"[渐进搜索] 半径={radius}m，当前已有{len(all_unique)}条，目标{target_count}条")
+            batch = _collect_pois_for_radius(radius)
+            # 合并去重
+            exist_ids = {p.get("id") for p in all_unique}
+            for p in batch:
+                if p.get("id") not in exist_ids:
+                    exist_ids.add(p.get("id"))
+                    all_unique.append(p)
+            tried_radii.append(radius)
+            if len(all_unique) >= target_count:
+                break
+        unique_pois = all_unique
+        used_radius = tried_radii[-1] if tried_radii else DEFAULT_RADIUS
+        print(f"[渐进搜索完成] 最终半径={used_radius}m，共{len(unique_pois)}条")
+    else:
+        # 非扩圈模式：单次搜索
+        unique_pois = _collect_pois_for_radius(DEFAULT_RADIUS)
+
+    # ========== 2. 附属条件筛选 ==========
     def check_sub_poi_nearby(poi_location, sub_kw, radius=500):
-        """检查单个POI周边是否有指定附属设施"""
         url = "https://restapi.amap.com/v3/place/around"
         params = {
             "key": AMAP_API_KEY, "keywords": sub_kw,
@@ -224,28 +249,26 @@ def search_poi(city, keywords, sub_keywords=[], center=""):
         poi_location = poi.get("location", "")
         if not poi_location:
             continue
-
-        # 检查所有附属条件
         has_all_sub = True
         for sub_kw in sub_keywords:
             if not check_sub_poi_nearby(poi_location, sub_kw):
                 has_all_sub = False
                 break
-
         filtered_pois.append(poi)
         has_sub_flags.append(has_all_sub)
 
-    # ========== 4. 排序（有中心坐标则按距离排序，无则按权重排序） ==========
-    if center:
+    # ========== 3. 按距离排序 ==========
+    if center and filtered_pois:
         center_lng, center_lat = map(float, center.split(","))
-        # 按距离中心的远近升序排序
         filtered_pois.sort(key=lambda p: haversine(
             center_lng, center_lat,
             float(p["location"].split(",")[0]), float(p["location"].split(",")[1])
         ))
 
-    # 限制返回最大数量
-    return filtered_pois[:RESULT_LIMIT], has_sub_flags[:RESULT_LIMIT]
+    # ========== 4. 截断到目标条数 ==========
+    limit = target_count if target_count else RESULT_LIMIT
+    limit = min(limit, RESULT_LIMIT)
+    return filtered_pois[:limit], has_sub_flags[:limit]
 
 
 def haversine(lon1, lat1, lon2, lat2):
@@ -414,6 +437,38 @@ def search():
         "session_id": session_id,
         "keywords": keywords  # 返回给前端，用于展示
     })
+
+
+# ========== 对话式查询接口 ==========
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.get_json()
+    user_message = data.get("message", "").strip()
+    session_id = data.get("session_id", "default_session")
+
+    if not user_message:
+        return jsonify({"error": "请输入消息"}), 400
+
+    response_data = process_chat_message(
+        user_query=user_message,
+        session_id=session_id,
+        conversation_context=conversation_context,
+        parse_func=parse_query_with_context,
+        geocode_func=geocode_address,
+        search_func=search_poi,
+        kde_func=calculate_kde,
+        insight_func=generate_density_insight,
+    )
+    return jsonify(response_data)
+
+
+@app.route('/reset', methods=['POST'])
+def reset():
+    data = request.get_json()
+    session_id = data.get("session_id", "")
+    if session_id and session_id in conversation_context:
+        del conversation_context[session_id]
+    return jsonify({"status": "ok"})
 
 
 if __name__ == '__main__':

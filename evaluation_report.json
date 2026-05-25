@@ -1,0 +1,80 @@
+{
+  "title": "POI Agent 评估报告",
+  "timestamp": "2026-05-25T17:53:26.891633",
+  "summary": {
+    "total_queries": 500,
+    "total_errors": 0,
+    "avg_response_time_s": 1.96,
+    "parse_accuracy": 97.4,
+    "geocode_success_rate": 54.6,
+    "search_success_rate": 100.0,
+    "total_poi_returned": 3065,
+    "avg_results_per_search": 11.2,
+    "avg_distance_km": 0.91,
+    "avg_type_relevance_pct": 50.6,
+    "avg_data_quality_score": 99.9,
+    "overall_score": 54.6
+  },
+  "parse_accuracy_by_category": {
+    "category_only": {
+      "total": 49,
+      "correct": 49,
+      "rate": 100.0
+    },
+    "complete": {
+      "total": 163,
+      "correct": 163,
+      "rate": 100.0
+    },
+    "location_with_category": {
+      "total": 19,
+      "correct": 19,
+      "rate": 100.0
+    },
+    "type_only": {
+      "total": 45,
+      "correct": 45,
+      "rate": 100.0
+    },
+    "greeting": {
+      "total": 14,
+      "correct": 14,
+      "rate": 100.0
+    },
+    "category_alias": {
+      "total": 28,
+      "correct": 28,
+      "rate": 100.0
+    },
+    "complete_with_count": {
+      "total": 73,
+      "correct": 73,
+      "rate": 100.0
+    },
+    "multi_type": {
+      "total": 18,
+      "correct": 18,
+      "rate": 100.0
+    },
+    "location_only": {
+      "total": 53,
+      "correct": 47,
+      "rate": 88.7
+    },
+    "vague": {
+      "total": 38,
+      "correct": 31,
+      "rate": 81.6
+    }
+  },
+  "response_type_distribution": {
+    "follow_up": 227,
+    "results": 273
+  },
+  "state_distribution": {
+    "awaiting_type": 180,
+    "idle": 34,
+    "awaiting_count": 13,
+    "has_context": 273
+  }
+}

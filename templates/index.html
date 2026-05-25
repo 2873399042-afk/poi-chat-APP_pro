@@ -4,48 +4,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POI地理信息查询助手</title>
-    <!-- 引入样式 -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <!-- 引入高德地图API -->
     <script src="https://webapi.amap.com/maps?v=2.0&key=6386faa16f05b2993b2172d720dead3a"></script>
-    <!-- 引入ECharts可视化库 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 </head>
 <body>
     <div class="container">
         <!-- 左侧查询&结果区 -->
         <div class="left-panel">
-            <h1> POI地理信息查询助手</h1>
-            <!-- 查询框 -->
-            <div class="query-box">
-                <input type="text" id="queryInput" placeholder="输入查询，如：南京信息工程大学附近的停车场">
-                <button id="searchBtn">查询</button>
+            <h1>POI地理信息查询助手</h1>
+
+            <!-- 模式切换 -->
+            <div class="mode-toggle">
+                <button id="chatModeBtn" class="active">对话模式</button>
+                <button id="searchModeBtn">快速搜索</button>
             </div>
-            <!-- 空间洞察 -->
-            <div class="insight-box">
-                <h3>📊 空间分析洞察</h3>
-                <p id="insightText">等待查询...</p>
+
+            <!-- 对话模式 -->
+            <div id="chatContainer">
+                <div id="chatMessages">
+                    <!-- 欢迎消息 -->
+                    <div class="chat-bubble assistant">
+                        你好！我是POI地理信息查询助手。<br>
+                        你可以直接告诉我你想查找什么，例如"南京信息工程大学附近的餐厅"。<br>
+                        也可以分步告诉我，我会引导你完成查询。
+                    </div>
+                </div>
+                <div id="quickReplies"></div>
+                <div class="chat-input-box">
+                    <input type="text" id="chatInput" placeholder="输入查询，如：南信大附近的poi">
+                    <button id="chatSendBtn">发送</button>
+                </div>
             </div>
-            <!-- POI结果列表 -->
+
+            <!-- 快速搜索模式（隐藏） -->
+            <div id="searchContainer" class="hidden">
+                <div class="query-box">
+                    <input type="text" id="queryInput" placeholder="输入查询，如：南京信息工程大学附近的停车场">
+                    <button id="searchBtn">查询</button>
+                </div>
+            </div>
+
+            <!-- POI结果列表（两种模式共享） -->
             <div class="result-list">
-                <h3>📍 POI结果（共<span id="totalCount">0</span>条）</h3>
+                <h3>POI结果（共<span id="totalCount">0</span>条）</h3>
                 <ul id="poiList"></ul>
+            </div>
+
+            <!-- 空间洞察（两种模式共享） -->
+            <div class="insight-box">
+                <h3>空间分析洞察</h3>
+                <p id="insightText">等待查询...</p>
             </div>
         </div>
 
         <!-- 右侧可视化区 -->
         <div class="right-panel">
-            <!-- 地图容器 -->
             <div id="map"></div>
-            <!-- 类型分布图表 -->
             <div class="chart-box">
-                <h3>📈 POI类型分布统计</h3>
+                <h3>POI类型分布统计</h3>
                 <div id="typeChart"></div>
             </div>
         </div>
     </div>
 
-    <!-- 引入前端交互JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
